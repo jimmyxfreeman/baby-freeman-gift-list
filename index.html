@@ -78,13 +78,27 @@
     .offlist li { display: block; }
     .formcard { border-left: 5px solid var(--wood); }
     .empty { color: var(--muted); font-style: italic; padding: 6px 2px; }
+    .tools { border-top: 5px solid var(--wood); }
+    .tools .searchwrap { position: relative; }
+    .tools .searchwrap svg { position: absolute; left: 11px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); pointer-events: none; }
+    .tools input[type=search] { width: 100%; padding: 11px 12px 11px 36px; border: 1px solid #cfc3aa; border-radius: 10px; font: inherit; background: #fff; color: var(--ink); -webkit-appearance: none; appearance: none; }
+    .tools input[type=search]:focus, .tools select:focus { outline: 2px solid var(--forest); outline-offset: 0; border-color: var(--forest); }
+    .tools .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 10px; margin-top: 8px; }
+    .tools label.sm { display: block; font-size: .78rem; color: var(--muted); margin: 0 0 2px 2px; font-weight: 600; letter-spacing: .2px; }
+    .tools select { padding: 9px 10px; font-size: .95rem; }
+    .tools .resline { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: .88rem; color: var(--muted); flex-wrap: wrap; }
+    .tools .resline button { background: none; border: 1px solid var(--forest); color: var(--forest-dark); border-radius: 99px; padding: 4px 12px; font-size: .85rem; cursor: pointer; }
+    .tools .resline button:hover { background: var(--soft); }
+    .tag.usa { background: #fbeedd; color: #8a4b12; }
+    .tag.cat { background: #eef0f6; color: var(--navy); }
+    mark { background: #f6e3a6; color: inherit; padding: 0 1px; border-radius: 3px; }
     #overlay { position: fixed; inset: 0; background: rgba(29,43,69,.55); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
     #overlay .card { max-width: 380px; width: 100%; text-align: center; border-top: 5px solid var(--forest); }
     #overlay h3 { margin: 4px 0 6px; color: var(--navy); font-size: 1.35rem; }
     #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--navy); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: .92rem; display: none; max-width: 92%; z-index: 20; }
     #toast.err { background: #a2453a; }
     .loading { text-align: center; color: var(--muted); padding: 30px 0; }
-    @media (max-width: 480px) { h1 { font-size: 1.45rem; } .row2 { grid-template-columns: 1fr; } header .hero { width: 128px; height: 120px; } }
+    @media (max-width: 480px) { h1 { font-size: 1.45rem; } .row2 { grid-template-columns: 1fr; } .tools .grid { grid-template-columns: 1fr 1fr; } header .hero { width: 128px; height: 120px; } }
     @media (prefers-reduced-motion: reduce) { .target #ring { transition: none; } }
   </style>
 </head>
@@ -178,6 +192,26 @@
       <label class="filter"><input type="checkbox" id="onlyOpen"> Show only items not yet bought</label>
     </div>
 
+
+    <div class="card tools" id="tools" role="search">
+      <div class="searchwrap">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#2f6b3f" stroke-width="2.4"/><circle cx="10" cy="10" r="2.4" fill="#c0472f"/><path d="M15 15l6 6" stroke="#a8703f" stroke-width="2.6" stroke-linecap="round"/></svg>
+        <input type="search" id="q" placeholder="Search items, products, brands, notes…" aria-label="Search the gift list" autocomplete="off" enterkeyhint="search">
+      </div>
+      <div class="grid">
+        <div><label class="sm" for="fltCat">Category</label><select id="fltCat"><option value="">All categories</option></select></div>
+        <div><label class="sm" for="fltVendor">Store / vendor</label><select id="fltVendor"><option value="">All stores</option></select></div>
+        <div><label class="sm" for="fltCountry">Country made</label><select id="fltCountry"><option value="">Any country</option></select></div>
+        <div><label class="sm" for="fltPrice">Price range</label><select id="fltPrice">
+          <option value="">Any price</option><option value="0-25">Under $25</option><option value="25-50">$25 – $50</option>
+          <option value="50-100">$50 – $100</option><option value="100-250">$100 – $250</option><option value="250-">$250 and up</option><option value="tbd">Price TBD</option>
+        </select></div>
+        <div><label class="sm" for="sortBy">Sort by</label><select id="sortBy">
+          <option value="">Category (default)</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name">Item name A–Z</option>
+        </select></div>
+      </div>
+      <div class="resline"><span id="resCount" aria-live="polite"></span><button type="button" id="clearTools">Clear filters</button></div>
+    </div>
     <div id="list"><div class="loading">Loading the list…</div></div>
 
     <h2>Things the family bought that weren't on the list</h2>
@@ -345,33 +379,132 @@
       call('getItems', [], function (res) { data = res; render(); });
     }
 
+
+    // ---- filter logic (start) ----
+    var GL = (function () {
+      var TAG_RE = /\s*·?\s*(Brand|Made in|Vendor):\s*([^·]*?)\s*(?=·|$)/gi;
+      function parseNotes(notes) {
+        var out = { brand: '', country: '', vendor: '', notes: '' };
+        var txt = String(notes || '');
+        txt = txt.replace(TAG_RE, function (m, k, v) {
+          k = k.toLowerCase();
+          if (k === 'brand') out.brand = v.trim(); else if (k === 'made in') out.country = v.trim(); else out.vendor = v.trim();
+          return '';
+        });
+        out.notes = txt.replace(/^[\s·]+|[\s·]+$/g, '');
+        return out;
+      }
+      function enrich(it) {
+        var p = parseNotes(it.notes);
+        it.cleanNotes = p.notes;
+        it.brand = it.brand || p.brand || '';
+        it.vendor = it.vendor || p.vendor || it.store || '';
+        it.country = it.country || p.country || '';
+        if (/^(us|u\.s\.a?\.?|united states( of america)?|america)$/i.test(it.country)) it.country = 'USA';
+        it._hay = [it.name, it.product, it.brand, it.category, it.cleanNotes, it.vendor, it.country].join(' \u0001 ').toLowerCase();
+        return it;
+      }
+      function priceOk(it, bucket) {
+        if (!bucket) return true;
+        var p = (typeof it.price === 'number' && isFinite(it.price)) ? it.price : null;
+        if (bucket === 'tbd') return p === null;
+        if (p === null) return false;
+        var parts = bucket.split('-'), lo = parseFloat(parts[0]) || 0, hi = parts[1] === '' || parts[1] === undefined ? Infinity : parseFloat(parts[1]);
+        return p >= lo && p < hi;
+      }
+      function matches(it, f) {
+        if (f.onlyOpen && it.purchased) return false;
+        if (f.cat && it.category !== f.cat) return false;
+        if (f.vendor && it.vendor !== f.vendor) return false;
+        if (f.country && (it.country || 'Unknown') !== f.country) return false;
+        if (!priceOk(it, f.price)) return false;
+        if (f.q) {
+          var words = f.q.toLowerCase().split(/\s+/).filter(Boolean);
+          for (var i = 0; i < words.length; i++) if (it._hay.indexOf(words[i]) === -1) return false;
+        }
+        return true;
+      }
+      function sortItems(items, how) {
+        var arr = items.slice();
+        function pr(it, dir) { return (typeof it.price === 'number' && isFinite(it.price)) ? it.price : (dir > 0 ? Infinity : -Infinity); }
+        if (how === 'price-asc') arr.sort(function (a, b) { return pr(a, 1) - pr(b, 1) || a.name.localeCompare(b.name); });
+        else if (how === 'price-desc') arr.sort(function (a, b) { return pr(b, -1) - pr(a, -1) || a.name.localeCompare(b.name); });
+        else if (how === 'name') arr.sort(function (a, b) { return a.name.localeCompare(b.name); });
+        return arr;
+      }
+      function options(items, key) {
+        var seen = {}, out = [];
+        items.forEach(function (it) { var v = it[key] || (key === 'country' ? 'Unknown' : ''); if (v && !seen[v]) { seen[v] = 1; out.push(v); } });
+        return out.sort(function (a, b) {
+          if (key === 'country') { if (a === 'USA') return -1; if (b === 'USA') return 1; if (a === 'Unknown') return 1; if (b === 'Unknown') return -1; }
+          return a.localeCompare(b);
+        });
+      }
+      return { parseNotes: parseNotes, enrich: enrich, priceOk: priceOk, matches: matches, sortItems: sortItems, options: options };
+    })();
+    // ---- filter logic (end) ----
+
     // ---- rendering ----
+    function getFilters() {
+      return { q: $('q').value.trim(), cat: $('fltCat').value, vendor: $('fltVendor').value, country: $('fltCountry').value,
+        price: $('fltPrice').value, sort: $('sortBy').value, onlyOpen: $('onlyOpen').checked };
+    }
+    function fillSelect(id, values, allLabel) {
+      var sel = $(id), cur = sel.value;
+      sel.textContent = '';
+      var o0 = el('option', '', allLabel); o0.value = ''; sel.appendChild(o0);
+      values.forEach(function (v) { var o = el('option', '', v === 'USA' ? 'USA (American-made)' : v); o.value = v; sel.appendChild(o); });
+      sel.value = values.indexOf(cur) !== -1 ? cur : '';
+    }
     function render() {
       if (!data) return;
-      var onlyOpen = $('onlyOpen').checked;
+      data.items.forEach(GL.enrich);
       $('count').textContent = data.counts.purchased + ' of ' + data.counts.total + ' bought';
       var pct = data.counts.total ? data.counts.purchased / data.counts.total : 0;
       $('ring').style.strokeDashoffset = String(226.2 * (1 - pct));
       $('updated').textContent = 'Updated ' + data.updated + ' · refreshes every minute';
 
+      fillSelect('fltCat', data.categories.slice(), 'All categories');
+      fillSelect('fltVendor', GL.options(data.items, 'vendor'), 'All stores');
+      fillSelect('fltCountry', GL.options(data.items, 'country'), 'Any country');
+
+      var f = getFilters();
+      var hits = data.items.filter(function (it) { return GL.matches(it, f); });
+      var anyFilter = !!(f.q || f.cat || f.vendor || f.country || f.price || f.sort);
+      $('resCount').textContent = anyFilter || f.onlyOpen ? 'Showing ' + hits.length + ' of ' + data.items.length + ' items' : data.items.length + ' items on the list';
+      $('clearTools').style.visibility = anyFilter ? 'visible' : 'hidden';
+
       var list = $('list');
       list.textContent = '';
-      var shown = 0;
-      data.categories.forEach(function (cat) {
-        var items = data.items.filter(function (it) { return it.category === cat; });
-        var left = items.filter(function (it) { return !it.purchased; }).length;
-        var visible = onlyOpen ? items.filter(function (it) { return !it.purchased; }) : items;
-        if (!visible.length) return;
-        var h = el('h2', '', cat + ' ');
-        h.appendChild(el('small', '', left ? left + ' still needed' : 'all bought 🎉'));
-        list.appendChild(h);
-        var card = el('div', 'card');
-        var ul = el('ul', 'items');
-        visible.forEach(function (it) { ul.appendChild(itemRow(it)); shown++; });
-        card.appendChild(ul);
-        list.appendChild(card);
-      });
-      if (!shown) list.appendChild(el('div', 'card empty', onlyOpen ? 'Everything on the list has been bought! 🎉' : 'No items found.'));
+      if (f.sort) {
+        var sorted = GL.sortItems(hits, f.sort);
+        if (sorted.length) {
+          var label = { 'price-asc': 'Price: low to high', 'price-desc': 'Price: high to low', name: 'Item name A–Z' }[f.sort];
+          var h = el('h2', '', label + ' ');
+          h.appendChild(el('small', '', sorted.filter(function (it) { return !it.purchased; }).length + ' still needed'));
+          list.appendChild(h);
+          var card = el('div', 'card'), ul = el('ul', 'items');
+          sorted.forEach(function (it) { ul.appendChild(itemRow(it, true, f.q)); });
+          card.appendChild(ul); list.appendChild(card);
+        }
+      } else {
+        data.categories.forEach(function (cat) {
+          var all = data.items.filter(function (it) { return it.category === cat; });
+          var visible = hits.filter(function (it) { return it.category === cat; });
+          if (!visible.length) return;
+          var left = all.filter(function (it) { return !it.purchased; }).length;
+          var h = el('h2', '', cat + ' ');
+          h.appendChild(el('small', '', left ? left + ' still needed' : 'all bought 🎉'));
+          list.appendChild(h);
+          var card = el('div', 'card'), ul = el('ul', 'items');
+          visible.forEach(function (it) { ul.appendChild(itemRow(it, false, f.q)); });
+          card.appendChild(ul); list.appendChild(card);
+        });
+      }
+      if (!hits.length) {
+        var msg = anyFilter ? 'No items match those filters. Try clearing the search or filters.' : (f.onlyOpen ? 'Everything on the list has been bought! 🎉' : 'No items found.');
+        list.appendChild(el('div', 'card empty', msg));
+      }
 
       var cats = $('catList');
       cats.textContent = '';
@@ -379,8 +512,23 @@
 
       renderOffList();
     }
+    function hl(parent, text, q) {
+      text = String(text || '');
+      var words = (q || '').toLowerCase().split(/\s+/).filter(function (w) { return w.length > 1; });
+      if (!words.length) { parent.appendChild(document.createTextNode(text)); return parent; }
+      var lower = text.toLowerCase(), i = 0;
+      while (i < text.length) {
+        var best = -1, len = 0;
+        words.forEach(function (w) { var j = lower.indexOf(w, i); if (j !== -1 && (best === -1 || j < best)) { best = j; len = w.length; } });
+        if (best === -1) { parent.appendChild(document.createTextNode(text.slice(i))); break; }
+        if (best > i) parent.appendChild(document.createTextNode(text.slice(i, best)));
+        parent.appendChild(el('mark', '', text.slice(best, best + len)));
+        i = best + len;
+      }
+      return parent;
+    }
 
-    function itemRow(it) {
+    function itemRow(it, showCat, q) {
       var li = el('li', it.purchased ? 'bought' : '');
       var cb = el('input');
       cb.type = 'checkbox';
@@ -390,14 +538,18 @@
       li.appendChild(cb);
 
       var box = el('div', 'it');
-      var name = el('div', 'name', it.name);
+      var name = hl(el('div', 'name'), it.name, q);
+      if (showCat) name.appendChild(el('span', 'tag cat', it.category));
+      if (it.country === 'USA') name.appendChild(el('span', 'tag usa', 'Made in USA'));
       if (it.plan === 'Self-buy') name.appendChild(el('span', 'tag', 'parents planned to buy'));
       box.appendChild(name);
-      if (it.product && it.product !== it.name) box.appendChild(el('div', 'prod', it.product));
+      if (it.product && it.product !== it.name) box.appendChild(hl(el('div', 'prod'), it.product, q));
       var meta = el('div', 'meta');
       var price = el('span', 'price', it.priceLabel + (it.qty > 1 ? ' each × ' + it.qty : ''));
       meta.appendChild(price);
-      if (it.store) meta.appendChild(document.createTextNode(' · ' + it.store));
+      if (it.vendor) meta.appendChild(document.createTextNode(' · ' + it.vendor));
+      if (it.brand && it.vendor.toLowerCase().indexOf(it.brand.toLowerCase()) === -1) { meta.appendChild(document.createTextNode(' · ')); hl(meta, it.brand, q); }
+      if (it.country && it.country !== 'Unknown' && it.country !== 'USA') meta.appendChild(document.createTextNode(' · Made in ' + it.country));
       if (it.link) {
         meta.appendChild(document.createTextNode(' · '));
         var a = el('a', '', 'View item ↗');
@@ -407,7 +559,7 @@
         meta.appendChild(a);
       }
       box.appendChild(meta);
-      if (it.notes) box.appendChild(el('div', 'note', it.notes));
+      if (it.cleanNotes) box.appendChild(hl(el('div', 'note'), it.cleanNotes, q));
       if (it.purchased) box.appendChild(el('div', 'boughtby', 'Bought by ' + it.buyer + (it.dateLabel ? ' on ' + it.dateLabel : '')));
       li.appendChild(box);
       return li;
@@ -485,6 +637,13 @@
     renderHello();
     if (!me) askName();
     load();
+    var qTimer = null;
+    $('q').addEventListener('input', function () { clearTimeout(qTimer); qTimer = setTimeout(render, 150); });
+    ['fltCat', 'fltVendor', 'fltCountry', 'fltPrice', 'sortBy'].forEach(function (id) { $(id).addEventListener('change', render); });
+    $('clearTools').addEventListener('click', function () {
+      $('q').value = ''; ['fltCat', 'fltVendor', 'fltCountry', 'fltPrice', 'sortBy'].forEach(function (id) { $(id).value = ''; });
+      render();
+    });
     setInterval(function () { if (!busy && !document.hidden) load(); }, REFRESH_MS);
     document.addEventListener('visibilitychange', function () { if (!document.hidden && !busy) load(); });
   })();
