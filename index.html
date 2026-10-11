@@ -207,7 +207,7 @@
           <option value="50-100">$50 – $100</option><option value="100-250">$100 – $250</option><option value="250-">$250 and up</option><option value="tbd">Price TBD</option>
         </select></div>
         <div><label class="sm" for="sortBy">Sort by</label><select id="sortBy">
-          <option value="">Category (default)</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name">Item name A–Z</option>
+          <option value="">Item name A–Z (default)</option><option value="cat">Group by category</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option>
         </select></div>
       </div>
       <div class="resline"><span id="resCount" aria-live="polite"></span><button type="button" id="clearTools">Clear filters</button></div>
@@ -447,7 +447,7 @@
     // ---- rendering ----
     function getFilters() {
       return { q: $('q').value.trim(), cat: $('fltCat').value, vendor: $('fltVendor').value, country: $('fltCountry').value,
-        price: $('fltPrice').value, sort: $('sortBy').value, onlyOpen: $('onlyOpen').checked };
+        price: $('fltPrice').value, sort: ($('sortBy').value === '' ? 'name' : ($('sortBy').value === 'cat' ? '' : $('sortBy').value)), rawSort: $('sortBy').value, onlyOpen: $('onlyOpen').checked };
     }
     function fillSelect(id, values, allLabel) {
       var sel = $(id), cur = sel.value;
@@ -470,7 +470,7 @@
 
       var f = getFilters();
       var hits = data.items.filter(function (it) { return GL.matches(it, f); });
-      var anyFilter = !!(f.q || f.cat || f.vendor || f.country || f.price || f.sort);
+      var anyFilter = !!(f.q || f.cat || f.vendor || f.country || f.price || f.rawSort);
       $('resCount').textContent = anyFilter || f.onlyOpen ? 'Showing ' + hits.length + ' of ' + data.items.length + ' items' : data.items.length + ' items on the list';
       $('clearTools').style.visibility = anyFilter ? 'visible' : 'hidden';
 
