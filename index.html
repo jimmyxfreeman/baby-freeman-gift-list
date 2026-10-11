@@ -207,7 +207,7 @@
           <option value="50-100">$50 – $100</option><option value="100-250">$100 – $250</option><option value="250-">$250 and up</option><option value="tbd">Price TBD</option>
         </select></div>
         <div><label class="sm" for="sortBy">Sort by</label><select id="sortBy">
-          <option value="">Item name A–Z (default)</option><option value="cat">Group by category</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option>
+          <option value="">Category A–Z (default)</option><option value="name">Item name A–Z</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option>
         </select></div>
       </div>
       <div class="resline"><span id="resCount" aria-live="polite"></span><button type="button" id="clearTools">Clear filters</button></div>
@@ -447,7 +447,7 @@
     // ---- rendering ----
     function getFilters() {
       return { q: $('q').value.trim(), cat: $('fltCat').value, vendor: $('fltVendor').value, country: $('fltCountry').value,
-        price: $('fltPrice').value, sort: ($('sortBy').value === '' ? 'name' : ($('sortBy').value === 'cat' ? '' : $('sortBy').value)), rawSort: $('sortBy').value, onlyOpen: $('onlyOpen').checked };
+        price: $('fltPrice').value, sort: $('sortBy').value, rawSort: $('sortBy').value, onlyOpen: $('onlyOpen').checked };
     }
     function fillSelect(id, values, allLabel) {
       var sel = $(id), cur = sel.value;
@@ -459,6 +459,7 @@
     function render() {
       if (!data) return;
       data.items.forEach(GL.enrich);
+      data.categories = data.categories.slice().sort(function (a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
       $('count').textContent = data.counts.purchased + ' of ' + data.counts.total + ' bought';
       var pct = data.counts.total ? data.counts.purchased / data.counts.total : 0;
       $('ring').style.strokeDashoffset = String(226.2 * (1 - pct));
