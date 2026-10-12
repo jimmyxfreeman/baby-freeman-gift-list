@@ -167,6 +167,7 @@
       <path d="M133 75 h7" stroke="#7a4b2a" stroke-width="3"/>
     </svg>
     <h1>Baby Freeman – Family Gift List</h1>
+    <p class="books-note" style="text-align:center;font-style:italic;margin:.6em auto 0;max-width:34em;line-height:1.5">Just one little request, we hope it's not too hard,<br>Please bring a book instead of a card.<br>By signing your book we will remember<br>and share your special gift even when you're not there!</p>
     <div class="tagline">Help us gear up our little adventurer!</div>
     <div class="hello" id="hello"></div>
   </header>
@@ -201,7 +202,7 @@
       <div class="grid">
         <div><label class="sm" for="fltCat">Category</label><select id="fltCat"><option value="">All categories</option></select></div>
         <div><label class="sm" for="fltVendor">Store / vendor</label><select id="fltVendor"><option value="">All stores</option></select></div>
-        <div><label class="sm" for="fltCountry">Country made</label><select id="fltCountry"><option value="">Any country</option></select></div>
+        <div style="display:none"><label class="sm" for="fltCountry">Country made</label><select id="fltCountry"><option value="">Any country</option></select></div>
         <div><label class="sm" for="fltPrice">Price range</label><select id="fltPrice">
           <option value="">Any price</option><option value="0-25">Under $25</option><option value="25-50">$25 – $50</option>
           <option value="50-100">$50 – $100</option><option value="100-250">$100 – $250</option><option value="250-">$250 and up</option><option value="tbd">Price TBD</option>
@@ -556,7 +557,7 @@
       var box = el('div', 'it');
       var name = hl(el('div', 'name'), it.name, q);
       if (showCat) name.appendChild(el('span', 'tag cat', it.category));
-      if (it.country === 'USA') name.appendChild(el('span', 'tag usa', 'Made in USA'));
+      // country tag removed
       if (it.plan === 'Self-buy') name.appendChild(el('span', 'tag', 'parents planned to buy'));
       box.appendChild(name);
       if (it.product && it.product !== it.name) box.appendChild(hl(el('div', 'prod'), it.product, q));
@@ -565,7 +566,7 @@
       meta.appendChild(price);
       // store name omitted; the Buy at link already names it
       if (it.brand && it.vendor.toLowerCase().indexOf(it.brand.toLowerCase()) === -1) { meta.appendChild(document.createTextNode(' · ')); hl(meta, it.brand, q); }
-      if (it.country && it.country !== 'Unknown' && it.country !== 'USA') meta.appendChild(document.createTextNode(' · Made in ' + it.country));
+      // country text removed
       if (it.link) {
         meta.appendChild(document.createTextNode(' · '));
         var mainLbl = (function (u) { var h = ''; try { h = new URL(u).hostname.toLowerCase(); } catch (e) {} if (/(^|\.)target\.com$/.test(h)) return 'Buy at Target'; if (/(^|\.)amazon\.[a-z.]+$/.test(h) || /(^|\.)amzn\.(to|com)$/.test(h)) return 'Buy at Amazon'; return 'View item'; })(it.link);
