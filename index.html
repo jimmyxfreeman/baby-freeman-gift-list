@@ -255,7 +255,8 @@
   </div>
   <div id="toast"></div>
 
-  <script>
+  <script>window.CATEGORY_LIST=["Acetaminophen", "Activity mat", "Baby Brezza", "Baby gates", "Baby soap", "Baby towels", "Baby wrap", "BabyBjörn carrier", "Bath", "Blankets", "Books", "Bookshelves", "Bottles", "Bouncer", "Bumbo", "Burp cloths", "Cabinet locks", "Car mirror", "Car seat", "Car-seat mobile", "Changing pad", "Changing table", "Clothing", "Crib – Cradlewise smart crib (used)", "Curtains", "Diapers", "Dresser", "Extra car-seat bases", "Extra – Health & wellness", "Extra – Keepsakes & nursery decor", "Extra – Pacifiers & teething", "Extra – Postpartum & parent care", "Extra – Potty & toddler transition", "Extra – Sleep sound & night lights", "Extra – Solids & toddler feeding", "Formula", "High chair", "Lotion", "Mattress", "Mini bottle washer", "Nail clippers", "Nose suction", "Outlet covers", "Rocking chair / glider", "Rug", "Sensitive detergent", "Sheets", "Shopping cart cover", "Stroller", "Swing", "Syringe droppers", "Thermometer", "Toilet locks", "Toys", "Trash bags", "Washcloths", "Waterproof cover"];
+
   (function () {
     'use strict';
     // Apps Script web app (deployment /exec URL). Public; no secrets on this page.
@@ -525,7 +526,7 @@
 
       var cats = $('catList');
       cats.textContent = '';
-      ['Books'].concat(data.categories.filter(function (c) { return c !== 'Books'; }), ['Other']).forEach(function (c) { var o = el('option'); o.value = c; cats.appendChild(o); });
+      (function(){var L=window.CATEGORY_LIST.slice();data.categories.forEach(function(c){if(L.indexOf(c)<0)L.push(c);});L.sort(function(a,b){return a.toLowerCase()<b.toLowerCase()?-1:1;});L=L.filter(function(c){return c!=='Books';});return ['Books'].concat(L,['Other']);})().forEach(function (c) { var o = el('option'); o.value = c; cats.appendChild(o); });
 
       renderOffList();
     }
