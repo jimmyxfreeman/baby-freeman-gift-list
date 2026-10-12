@@ -382,10 +382,23 @@
 
     // ---- filter logic (start) ----
     var GL = (function () {
+      var URL_RE = /https?:\/\/[^\s<>"']+/gi;
+      function storeLabel(url) {
+        var host = '';
+        try { host = new URL(url).hostname.toLowerCase(); } catch (e) { return ''; }
+        if (/(^|\.)amazon\.[a-z.]+$/.test(host) || /(^|\.)amzn\.(to|com)$/.test(host)) return 'Buy at Amazon';
+        if (/(^|\.)target\.com$/.test(host)) return 'Buy at Target';
+        return 'Also available here';
+      }
       var TAG_RE = /\s*·?\s*(Brand|Made in|Vendor):\s*([^·]*?)\s*(?=·|$)/gi;
       function parseNotes(notes) {
-        var out = { brand: '', country: '', vendor: '', notes: '' };
+        var out = { brand: '', country: '', vendor: '', notes: '', links: [] };
         var txt = String(notes || '');
+        txt = txt.replace(URL_RE, function (u) {
+          u = u.replace(/[).,;]+$/, '');
+          if (out.links.indexOf(u) === -1) out.links.push(u);
+          return ' ';
+        });
         txt = txt.replace(TAG_RE, function (m, k, v) {
           k = k.toLowerCase();
           if (k === 'brand') out.brand = v.trim(); else if (k === 'made in') out.country = v.trim(); else out.vendor = v.trim();
@@ -397,6 +410,8 @@
       function enrich(it) {
         var p = parseNotes(it.notes);
         it.cleanNotes = p.notes;
+        it.altLinks = p.links.filter(function (u) { return u !== it.link && storeLabel(u); })
+          .map(function (u) { return { url: u, label: storeLabel(u) }; });
         it.brand = it.brand || p.brand || '';
         it.vendor = it.vendor || p.vendor || it.store || '';
         it.country = it.country || p.country || '';
@@ -440,7 +455,7 @@
           return a.localeCompare(b);
         });
       }
-      return { parseNotes: parseNotes, enrich: enrich, priceOk: priceOk, matches: matches, sortItems: sortItems, options: options };
+      return { parseNotes: parseNotes, storeLabel: storeLabel, enrich: enrich, priceOk: priceOk, matches: matches, sortItems: sortItems, options: options };
     })();
     // ---- filter logic (end) ----
 
@@ -559,6 +574,14 @@
         a.rel = 'noopener noreferrer';
         meta.appendChild(a);
       }
+      (it.altLinks || []).forEach(function (alt) {
+        meta.appendChild(document.createTextNode(' · '));
+        var b = el('a', 'alt', alt.label + ' ↗');
+        b.href = alt.url;
+        b.target = '_blank';
+        b.rel = 'noopener noreferrer';
+        meta.appendChild(b);
+      });
       box.appendChild(meta);
       if (it.cleanNotes) box.appendChild(hl(el('div', 'note'), it.cleanNotes, q));
       if (it.purchased) box.appendChild(el('div', 'boughtby', 'Bought by ' + it.buyer + (it.dateLabel ? ' on ' + it.dateLabel : '')));
