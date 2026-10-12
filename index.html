@@ -394,8 +394,9 @@
       }
       var TAG_RE = /\s*·?\s*(Brand|Made in|Vendor):\s*([^·]*?)\s*(?=·|$)/gi;
       function parseNotes(notes) {
-        var out = { brand: '', country: '', vendor: '', notes: '', links: [], altPrice: '' };
+        var out = { brand: '', country: '', vendor: '', notes: '', links: [], altPrice: '', group: '' };
         var txt = String(notes || '');
+        txt = txt.replace(/\s*Group:\s*([^\n]*?)\s*$/i, function (m, g) { out.group = g.trim().toLowerCase(); return ''; });
         txt = txt.replace(/\s*Amazon price:\s*(\$?\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?)/i, function (m, v) {
           out.altPrice = v.replace(/\s+/g, '');
           if (out.altPrice.charAt(0) !== '$') out.altPrice = '$' + out.altPrice;
@@ -417,6 +418,7 @@
       function enrich(it) {
         var p = parseNotes(it.notes);
         it.cleanNotes = p.notes;
+        it.group = p.group;
         it.altLinks = p.links.filter(function (u) { return u !== it.link && storeLabel(u); })
           .map(function (u) { return { url: u, label: storeLabel(u), price: (p.altPrice && storeLabel(u) === 'Buy at Amazon') ? p.altPrice : '' }; });
         it.brand = it.brand || p.brand || '';
@@ -425,6 +427,17 @@
         if (/^(us|u\.s\.a?\.?|united states( of america)?|america)$/i.test(it.country)) it.country = 'USA';
         it._hay = [it.name, it.product, it.brand, it.category, it.cleanNotes, it.vendor, it.country].join(' \u0001 ').toLowerCase();
         return it;
+      }
+      // Either-or groups: once any item in a group is bought, the others are covered.
+      function applyGroups(items) {
+        var bought = {};
+        items.forEach(function (it) { if (it.group && it.purchased && !bought[it.group]) bought[it.group] = it; });
+        items.forEach(function (it) {
+          var b = it.group && bought[it.group];
+          it.covered = !!(b && !it.purchased);
+          it.coveredBy = it.covered ? b.name : '';
+        });
+        return items;
       }
       function priceOk(it, bucket) {
         if (!bucket) return true;
@@ -435,7 +448,7 @@
         return p >= lo && p < hi;
       }
       function matches(it, f) {
-        if (f.onlyOpen && it.purchased) return false;
+        if (f.onlyOpen && (it.purchased || it.covered)) return false;
         if (f.cat && it.category !== f.cat) return false;
         if (f.vendor && it.vendor !== f.vendor) return false;
         if (f.country && (it.country || 'Unknown') !== f.country) return false;
@@ -462,7 +475,7 @@
           return a.localeCompare(b);
         });
       }
-      return { parseNotes: parseNotes, storeLabel: storeLabel, enrich: enrich, priceOk: priceOk, matches: matches, sortItems: sortItems, options: options };
+      return { applyGroups: applyGroups, parseNotes: parseNotes, storeLabel: storeLabel, enrich: enrich, priceOk: priceOk, matches: matches, sortItems: sortItems, options: options };
     })();
     // ---- filter logic (end) ----
 
@@ -481,6 +494,7 @@
     function render() {
       if (!data) return;
       data.items.forEach(GL.enrich);
+      GL.applyGroups(data.items);
       data.categories = data.categories.slice().sort(function (a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
       $('count').textContent = data.counts.purchased + ' of ' + data.counts.total + ' bought';
       var pct = data.counts.total ? data.counts.purchased / data.counts.total : 0;
@@ -504,7 +518,7 @@
         if (sorted.length) {
           var label = { 'price-asc': 'Price: low to high', 'price-desc': 'Price: high to low', name: 'Item name A–Z' }[f.sort];
           var h = el('h2', '', label + ' ');
-          h.appendChild(el('small', '', sorted.filter(function (it) { return !it.purchased; }).length + ' still needed'));
+          h.appendChild(el('small', '', sorted.filter(function (it) { return !it.purchased && !it.covered; }).length + ' still needed'));
           list.appendChild(h);
           var card = el('div', 'card'), ul = el('ul', 'items');
           sorted.forEach(function (it) { ul.appendChild(itemRow(it, true, f.q)); });
@@ -515,7 +529,7 @@
           var all = data.items.filter(function (it) { return it.category === cat; });
           var visible = hits.filter(function (it) { return it.category === cat; });
           if (!visible.length) return;
-          var left = all.filter(function (it) { return !it.purchased; }).length;
+          var left = all.filter(function (it) { return !it.purchased && !it.covered; }).length;
           var h = el('h2', '', cat + ' ');
           h.appendChild(el('small', '', left ? left + ' still needed' : 'all bought 🎉'));
           list.appendChild(h);
@@ -552,12 +566,13 @@
     }
 
     function itemRow(it, showCat, q) {
-      var li = el('li', it.purchased ? 'bought' : '');
+      var li = el('li', it.purchased ? 'bought' : (it.covered ? 'bought covered' : ''));
       var cb = el('input');
       cb.type = 'checkbox';
       cb.checked = !!it.purchased;
+      if (it.covered) { cb.disabled = true; cb.title = 'Covered \u2014 another option was bought'; }
       cb.setAttribute('aria-label', 'Mark ' + it.name + ' as bought');
-      cb.addEventListener('change', function () { toggle(it, cb, li); });
+      cb.addEventListener('change', function () { if (it.covered) { cb.checked = false; return; } toggle(it, cb, li); });
       li.appendChild(cb);
 
       var box = el('div', 'it');
@@ -593,6 +608,7 @@
       });
       box.appendChild(meta);
       if (it.cleanNotes) box.appendChild(hl(el('div', 'note'), it.cleanNotes, q));
+      if (it.covered) box.appendChild(el('div', 'boughtby', 'Covered \u2014 another option was bought' + (it.coveredBy ? ' (' + it.coveredBy + ')' : '')));
       if (it.purchased) box.appendChild(el('div', 'boughtby', 'Bought by ' + it.buyer + (it.dateLabel ? ' on ' + it.dateLabel : '')));
       li.appendChild(box);
       return li;
