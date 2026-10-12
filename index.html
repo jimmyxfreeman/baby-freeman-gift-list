@@ -563,7 +563,7 @@
       var meta = el('div', 'meta');
       var price = el('span', 'price', it.priceLabel + (it.qty > 1 ? ' each × ' + it.qty : ''));
       meta.appendChild(price);
-      if (it.vendor) meta.appendChild(document.createTextNode(' · ' + it.vendor));
+      // store name omitted; the Buy at link already names it
       if (it.brand && it.vendor.toLowerCase().indexOf(it.brand.toLowerCase()) === -1) { meta.appendChild(document.createTextNode(' · ')); hl(meta, it.brand, q); }
       if (it.country && it.country !== 'Unknown' && it.country !== 'USA') meta.appendChild(document.createTextNode(' · Made in ' + it.country));
       if (it.link) {
