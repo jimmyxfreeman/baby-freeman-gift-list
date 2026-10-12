@@ -394,8 +394,13 @@
       }
       var TAG_RE = /\s*·?\s*(Brand|Made in|Vendor):\s*([^·]*?)\s*(?=·|$)/gi;
       function parseNotes(notes) {
-        var out = { brand: '', country: '', vendor: '', notes: '', links: [] };
+        var out = { brand: '', country: '', vendor: '', notes: '', links: [], altPrice: '' };
         var txt = String(notes || '');
+        txt = txt.replace(/\s*Amazon price:\s*(\$?\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?)/i, function (m, v) {
+          out.altPrice = v.replace(/\s+/g, '');
+          if (out.altPrice.charAt(0) !== '$') out.altPrice = '$' + out.altPrice;
+          return ' ';
+        });
         txt = txt.replace(URL_RE, function (u) {
           u = u.replace(/[).,;]+$/, '');
           if (out.links.indexOf(u) === -1) out.links.push(u);
@@ -413,7 +418,7 @@
         var p = parseNotes(it.notes);
         it.cleanNotes = p.notes;
         it.altLinks = p.links.filter(function (u) { return u !== it.link && storeLabel(u); })
-          .map(function (u) { return { url: u, label: storeLabel(u) }; });
+          .map(function (u) { return { url: u, label: storeLabel(u), price: (p.altPrice && storeLabel(u) === 'Buy at Amazon') ? p.altPrice : '' }; });
         it.brand = it.brand || p.brand || '';
         it.vendor = it.vendor || p.vendor || it.store || '';
         it.country = it.country || p.country || '';
@@ -584,6 +589,7 @@
         b.target = '_blank';
         b.rel = 'noopener noreferrer';
         meta.appendChild(b);
+        if (alt.price) meta.appendChild(document.createTextNode(' (Amazon ' + alt.price + ')'));
       });
       box.appendChild(meta);
       if (it.cleanNotes) box.appendChild(hl(el('div', 'note'), it.cleanNotes, q));
