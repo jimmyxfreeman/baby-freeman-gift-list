@@ -568,7 +568,8 @@
       if (it.country && it.country !== 'Unknown' && it.country !== 'USA') meta.appendChild(document.createTextNode(' · Made in ' + it.country));
       if (it.link) {
         meta.appendChild(document.createTextNode(' · '));
-        var a = el('a', '', 'View item ↗');
+        var mainLbl = (function (u) { var h = ''; try { h = new URL(u).hostname.toLowerCase(); } catch (e) {} if (/(^|\.)target\.com$/.test(h)) return 'Buy at Target'; if (/(^|\.)amazon\.[a-z.]+$/.test(h) || /(^|\.)amzn\.(to|com)$/.test(h)) return 'Buy at Amazon'; return 'View item'; })(it.link);
+        var a = el('a', '', mainLbl + ' ↗');
         a.href = it.link;
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
