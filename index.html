@@ -525,7 +525,7 @@
 
       var cats = $('catList');
       cats.textContent = '';
-      data.categories.concat(['Other']).forEach(function (c) { var o = el('option'); o.value = c; cats.appendChild(o); });
+      ['Books'].concat(data.categories.filter(function (c) { return c !== 'Books'; }), ['Other']).forEach(function (c) { var o = el('option'); o.value = c; cats.appendChild(o); });
 
       renderOffList();
     }
