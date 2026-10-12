@@ -367,6 +367,7 @@
     function showLoadError() {
       var list = $('list');
       list.textContent = '';
+      var tip = el('div', 'card', 'Buying a gift? Use the \u201cBuy on our registry\u201d button, then find the item on the registry and tap \u201cBuy gift\u201d (Target) or \u201cAdd to Cart\u201d (Amazon) right there, so it gets checked off for everyone.'); tip.style.padding = '10px 14px'; tip.style.marginBottom = '12px'; list.appendChild(tip);
       var card = el('div', 'card empty', 'Couldn\u2019t load the list right now. ');
       var b = el('button', 'link', 'Try again');
       b.type = 'button';
@@ -566,21 +567,18 @@
       if (it.vendor) meta.appendChild(document.createTextNode(' · ' + it.vendor));
       if (it.brand && it.vendor.toLowerCase().indexOf(it.brand.toLowerCase()) === -1) { meta.appendChild(document.createTextNode(' · ')); hl(meta, it.brand, q); }
       if (it.country && it.country !== 'Unknown' && it.country !== 'USA') meta.appendChild(document.createTextNode(' · Made in ' + it.country));
-      if (it.link) {
+      var REG = { target: 'https://www.target.com/gift-registry/gift/sammie-46', amazon: 'https://www.amazon.com/baby-reg/sammie-freeman-february-2027-firestone/XIVN2ZWW96OP' };
+      function storeOf(u) { var h = ''; try { h = new URL(u).hostname.toLowerCase(); } catch (e) { return ''; } if (/(^|\.)target\.com$/.test(h)) return 'target'; if (/(^|\.)amazon\.[a-z.]+$/.test(h) || /(^|\.)amzn\.(to|com)$/.test(h)) return 'amazon'; return ''; }
+      var allLinks = []; if (it.link) allLinks.push(it.link); (it.altLinks || []).forEach(function (alt) { allLinks.push(alt.url); });
+      allLinks.forEach(function (u, idx) {
+        var st = storeOf(u);
         meta.appendChild(document.createTextNode(' · '));
-        var a = el('a', '', 'View item ↗');
-        a.href = it.link;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
+        var a;
+        if (st) { a = el('a', idx ? 'alt' : '', 'Buy on our ' + (st === 'target' ? 'Target' : 'Amazon') + ' registry ↗'); a.href = REG[st]; a.title = 'Opens our registry so the gift gets checked off there'; }
+        else { a = el('a', idx ? 'alt' : '', (idx ? 'Also available here' : 'View item') + ' ↗'); a.href = u; }
+        a.target = '_blank'; a.rel = 'noopener noreferrer';
         meta.appendChild(a);
-      }
-      (it.altLinks || []).forEach(function (alt) {
-        meta.appendChild(document.createTextNode(' · '));
-        var b = el('a', 'alt', alt.label + ' ↗');
-        b.href = alt.url;
-        b.target = '_blank';
-        b.rel = 'noopener noreferrer';
-        meta.appendChild(b);
+        if (st) { meta.appendChild(document.createTextNode(' ')); var d = el('a', 'alt', '(details)'); d.href = u; d.target = '_blank'; d.rel = 'noopener noreferrer'; meta.appendChild(d); }
       });
       box.appendChild(meta);
       if (it.cleanNotes) box.appendChild(hl(el('div', 'note'), it.cleanNotes, q));
