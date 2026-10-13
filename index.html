@@ -429,6 +429,35 @@
         return it;
       }
       // Either-or groups: once any item in a group is bought, the others are covered.
+      // Partial purchases (Qty > 1): stored as off-list records whose Notes start with
+      // "[partial:<item key>:<count>]" (the deployed API allows only one mark per item).
+      var PARTIAL_RE = /^\s*\[partial:([^:\]]+):(\d+)\]\s*/i;
+      function partialTag(key, n) { return '[partial:' + key + ':' + n + '] '; }
+      function applyPartials(data) {
+        var by = {}, rest = [];
+        (data.offList || []).forEach(function (o) {
+          var m = PARTIAL_RE.exec(String(o.notes || ''));
+          if (!m) { rest.push(o); return; }
+          (by[m[1]] = by[m[1]] || []).push({ key: o.key, n: parseInt(m[2], 10) || 0, buyer: o.buyer, dateLabel: o.dateLabel });
+        });
+        data.offList = rest;
+        var full = 0;
+        data.items.forEach(function (it) {
+          var qty = it.qty > 1 ? it.qty : 1;
+          it.marked = !!it.purchased;
+          it.partials = by[it.key] || [];
+          var got = it.partials.reduce(function (a, p) { return a + p.n; }, 0);
+          it.boughtQty = it.marked ? qty : Math.min(qty, got);
+          it.remaining = qty - it.boughtQty;
+          it.purchased = it.remaining <= 0;
+          if (it.purchased && !it.marked) {
+            it.buyer = it.partials.map(function (p) { return p.buyer; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(', ');
+          }
+          if (it.purchased) full++;
+        });
+        data.counts = { total: data.items.length, purchased: full, offList: data.offList.length };
+        return data;
+      }
       function applyGroups(items) {
         var bought = {};
         items.forEach(function (it) { if (it.group && it.purchased && !bought[it.group]) bought[it.group] = it; });
@@ -475,7 +504,7 @@
           return a.localeCompare(b);
         });
       }
-      return { applyGroups: applyGroups, parseNotes: parseNotes, storeLabel: storeLabel, enrich: enrich, priceOk: priceOk, matches: matches, sortItems: sortItems, options: options };
+      return { applyPartials: applyPartials, partialTag: partialTag, applyGroups: applyGroups, parseNotes: parseNotes, storeLabel: storeLabel, enrich: enrich, priceOk: priceOk, matches: matches, sortItems: sortItems, options: options };
     })();
     // ---- filter logic (end) ----
 
@@ -494,6 +523,7 @@
     function render() {
       if (!data) return;
       data.items.forEach(GL.enrich);
+      if (!data._partialsDone) { GL.applyPartials(data); data._partialsDone = true; }
       GL.applyGroups(data.items);
       data.categories = data.categories.slice().sort(function (a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
       $('count').textContent = data.counts.purchased + ' of ' + data.counts.total + ' bought';
@@ -608,6 +638,22 @@
       });
       box.appendChild(meta);
       if (it.cleanNotes) box.appendChild(hl(el('div', 'note'), it.cleanNotes, q));
+      if (!it.purchased && it.partials && it.partials.length) {
+        var qn = it.qty > 1 ? it.qty : 1;
+        box.appendChild(el('div', 'boughtby', it.remaining + ' of ' + qn + ' still needed \u2014 bought so far: ' +
+          it.partials.map(function (p) { return p.buyer + ' \u00d7' + p.n; }).join(', ')));
+        var mine = it.partials.filter(function (p) { return me && p.buyer.toLowerCase() === me.toLowerCase(); });
+        if (mine.length) {
+          var um = el('button', 'link', 'Undo my ' + (mine.length > 1 ? 'latest ' : '') + 'part');
+          um.type = 'button';
+          um.addEventListener('click', function () {
+            var p = mine[mine.length - 1];
+            if (!confirm('Undo your purchase of ' + p.n + ' \u00d7 ' + it.name + '?')) return;
+            call('undoPurchase', [p.key, me], function (res) { if (res && !res.ok) toast(res.message, true); else toast('Undone.'); load(); });
+          });
+          box.appendChild(um);
+        }
+      }
       if (it.covered) box.appendChild(el('div', 'boughtby', 'Covered \u2014 another option was bought' + (it.coveredBy ? ' (' + it.coveredBy + ')' : '')));
       if (it.purchased) box.appendChild(el('div', 'boughtby', 'Bought by ' + it.buyer + (it.dateLabel ? ' on ' + it.dateLabel : '')));
       li.appendChild(box);
@@ -644,11 +690,35 @@
     function toggle(it, cb, li) {
       if (!me) { cb.checked = !cb.checked; askName(); return; }
       if (cb.checked) {
+        var qty = it.qty > 1 ? it.qty : 1;
+        var rem = typeof it.remaining === 'number' ? it.remaining : qty;
+        var n = rem;
+        if (qty > 1 && rem > 1) {
+          var ans = prompt('How many of "' + it.name + '" did you buy? (1 to ' + rem + ')', String(rem));
+          if (ans === null) { cb.checked = false; return; }
+          n = parseInt(String(ans).trim(), 10);
+          if (!(n >= 1 && n <= rem)) { cb.checked = false; toast('Please enter a number from 1 to ' + rem + '.', true); return; }
+        }
         li.className = 'busy';
+        if (n < rem) {
+          call('addOffList', [me, it.name, it.category || 'Other', '', '', GL.partialTag(it.key, n) + 'Bought ' + n + ' of ' + qty], function () {
+            toast('Thanks, ' + me + '! Marked ' + n + ' of ' + qty + ' as bought.');
+            load();
+          });
+          return;
+        }
         call('markPurchased', [it.key, me], function (res) {
           if (res && !res.ok) toast(res.message, true); else toast('Thanks, ' + me + '! Marked as bought.');
           load();
         });
+      } else if (!it.marked) {
+        // Completed only through partial purchases: undo the user's own latest part.
+        var own = (it.partials || []).filter(function (p) { return p.buyer.toLowerCase() === me.toLowerCase(); });
+        if (!own.length) { cb.checked = true; toast('Only the people who bought this can undo their part.', true); return; }
+        var p = own[own.length - 1];
+        if (!confirm('Undo your purchase of ' + p.n + ' \u00d7 ' + it.name + '?')) { cb.checked = true; return; }
+        li.className = 'busy';
+        call('undoPurchase', [p.key, me], function (res) { if (res && !res.ok) toast(res.message, true); else toast('Undone.'); load(); });
       } else {
         var msg = it.buyer && it.buyer.toLowerCase() !== me.toLowerCase()
           ? it.name + ' was marked as bought by ' + it.buyer + '. Undo it anyway?'
