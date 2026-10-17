@@ -246,7 +246,7 @@
   <div id="overlay">
     <div class="card">
       <h3>Welcome, adventurer! 🏹</h3>
-      <p style="margin:0 0 10px;color:var(--muted)">Type your name so everyone knows who bought what.</p>
+      <p style="margin:0 0 10px;color:var(--muted)">Type your name so we can keep track of who bought what (only the family sees names).</p>
       <form id="nameForm">
         <input type="text" id="nameInput" maxlength="60" placeholder="Your name (e.g. Aunt Sue)" required>
         <button class="primary" type="submit" style="width:100%">Continue</button>
@@ -640,8 +640,7 @@
       if (it.cleanNotes) box.appendChild(hl(el('div', 'note'), it.cleanNotes, q));
       if (!it.purchased && it.partials && it.partials.length) {
         var qn = it.qty > 1 ? it.qty : 1;
-        box.appendChild(el('div', 'boughtby', it.remaining + ' of ' + qn + ' still needed \u2014 bought so far: ' +
-          it.partials.map(function (p) { return p.buyer + ' \u00d7' + p.n; }).join(', ')));
+        box.appendChild(el('div', 'boughtby', it.remaining + ' of ' + qn + ' still needed'));
         var mine = it.partials.filter(function (p) { return me && p.buyer.toLowerCase() === me.toLowerCase(); });
         if (mine.length) {
           var um = el('button', 'link', 'Undo my ' + (mine.length > 1 ? 'latest ' : '') + 'part');
@@ -655,7 +654,7 @@
         }
       }
       if (it.covered) box.appendChild(el('div', 'boughtby', 'Covered \u2014 another option was bought' + (it.coveredBy ? ' (' + it.coveredBy + ')' : '')));
-      if (it.purchased) box.appendChild(el('div', 'boughtby', 'Bought by ' + it.buyer + (it.dateLabel ? ' on ' + it.dateLabel : '')));
+      if (it.purchased) box.appendChild(el('div', 'boughtby', 'Bought' + (it.dateLabel ? ' on ' + it.dateLabel : '')));
       li.appendChild(box);
       return li;
     }
@@ -671,7 +670,7 @@
         var bits = [o.category, o.priceLabel, o.store].filter(Boolean).join(' · ');
         if (bits) box.appendChild(el('div', 'meta', bits));
         if (o.notes) box.appendChild(el('div', 'prod', o.notes));
-        box.appendChild(el('div', 'boughtby', 'Bought by ' + o.buyer + (o.dateLabel ? ' on ' + o.dateLabel : '')));
+        box.appendChild(el('div', 'boughtby', (me && o.buyer.toLowerCase() === me.toLowerCase() ? 'Added by you' : 'Added') + (o.dateLabel ? ' on ' + o.dateLabel : '')));
         if (me && o.buyer.toLowerCase() === me.toLowerCase()) {
           var rm = el('button', 'link', 'Remove');
           rm.type = 'button';
@@ -721,7 +720,7 @@
         call('undoPurchase', [p.key, me], function (res) { if (res && !res.ok) toast(res.message, true); else toast('Undone.'); load(); });
       } else {
         var msg = it.buyer && it.buyer.toLowerCase() !== me.toLowerCase()
-          ? it.name + ' was marked as bought by ' + it.buyer + '. Undo it anyway?'
+          ? it.name + ' was marked as bought by someone else. Undo it anyway?'
           : 'Un-mark ' + it.name + ' as bought?';
         if (!confirm(msg)) { cb.checked = true; return; }
         li.className = 'busy';
