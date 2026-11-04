@@ -714,13 +714,14 @@
       } else if (!it.marked) {
         // Completed only through partial purchases: undo the user's own latest part.
         var own = (it.partials || []).filter(function (p) { return p.buyer.toLowerCase() === me.toLowerCase(); });
+        if (me.toLowerCase() === 'mommy' && !own.length) own = it.partials || [];
         if (!own.length) { cb.checked = true; toast('Only the people who bought this can undo their part.', true); return; }
         var p = own[own.length - 1];
         if (!confirm('Undo your purchase of ' + p.n + ' \u00d7 ' + it.name + '?')) { cb.checked = true; return; }
         li.className = 'busy';
         call('undoPurchase', [p.key, me], function (res) { if (res && !res.ok) toast(res.message, true); else toast('Undone.'); load(); });
       } else {
-        if (it.buyer && it.buyer.toLowerCase() !== me.toLowerCase()) { cb.checked = true; toast('Only the person who marked this as bought can undo it.', true); return; }
+        if (me.toLowerCase() !== 'mommy' && it.buyer && it.buyer.toLowerCase() !== me.toLowerCase()) { cb.checked = true; toast('Only the person who marked this as bought can undo it.', true); return; }
         if (!confirm('Un-mark ' + it.name + ' as bought?')) { cb.checked = true; return; }
         li.className = 'busy';
         call('undoPurchase', [it.key, me], function (res) {
