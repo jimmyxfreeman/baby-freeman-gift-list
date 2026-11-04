@@ -720,10 +720,8 @@
         li.className = 'busy';
         call('undoPurchase', [p.key, me], function (res) { if (res && !res.ok) toast(res.message, true); else toast('Undone.'); load(); });
       } else {
-        var msg = it.buyer && it.buyer.toLowerCase() !== me.toLowerCase()
-          ? it.name + ' was marked as bought by someone else. Undo it anyway?'
-          : 'Un-mark ' + it.name + ' as bought?';
-        if (!confirm(msg)) { cb.checked = true; return; }
+        if (it.buyer && it.buyer.toLowerCase() !== me.toLowerCase()) { cb.checked = true; toast('Only the person who marked this as bought can undo it.', true); return; }
+        if (!confirm('Un-mark ' + it.name + ' as bought?')) { cb.checked = true; return; }
         li.className = 'busy';
         call('undoPurchase', [it.key, me], function (res) {
           if (res && !res.ok) toast(res.message, true); else toast('Undone.');
