@@ -497,6 +497,14 @@
         else if (how === 'name') arr.sort(function (a, b) { return a.name.localeCompare(b.name); });
         return arr;
       }
+      // Default category view: still-needed items first, bought/covered last, sheet order within each group.
+      function openFirst(items) {
+        return items.map(function (it, i) { return { it: it, i: i }; }).sort(function (a, b) {
+          var aDone = (a.it.purchased || a.it.covered) ? 1 : 0;
+          var bDone = (b.it.purchased || b.it.covered) ? 1 : 0;
+          return aDone - bDone || a.i - b.i;
+        }).map(function (x) { return x.it; });
+      }
       function options(items, key) {
         var seen = {}, out = [];
         items.forEach(function (it) { var v = it[key] || (key === 'country' ? 'Unknown' : ''); if (v && !seen[v]) { seen[v] = 1; out.push(v); } });
@@ -505,7 +513,7 @@
           return a.localeCompare(b);
         });
       }
-      return { applyPartials: applyPartials, partialTag: partialTag, applyGroups: applyGroups, parseNotes: parseNotes, storeLabel: storeLabel, enrich: enrich, priceOk: priceOk, matches: matches, sortItems: sortItems, options: options };
+      return { applyPartials: applyPartials, partialTag: partialTag, applyGroups: applyGroups, parseNotes: parseNotes, storeLabel: storeLabel, enrich: enrich, priceOk: priceOk, matches: matches, sortItems: sortItems, openFirst: openFirst, options: options };
     })();
     // ---- filter logic (end) ----
 
@@ -565,7 +573,7 @@
           h.appendChild(el('small', '', left ? left + ' still needed' : 'all bought 🎉'));
           list.appendChild(h);
           var card = el('div', 'card'), ul = el('ul', 'items');
-          visible.forEach(function (it) { ul.appendChild(itemRow(it, false, f.q)); });
+          GL.openFirst(visible).forEach(function (it) { ul.appendChild(itemRow(it, false, f.q)); });
           card.appendChild(ul); list.appendChild(card);
         });
       }
