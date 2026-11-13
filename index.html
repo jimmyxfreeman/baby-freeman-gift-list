@@ -668,11 +668,24 @@
       return li;
     }
 
+    function bookTitleKey(title) {
+      return String(title || '').trim().toLowerCase().replace(/^(the|an|a)\s+/, '');
+    }
+    function isOffListBook(o) {
+      var c = String(o.category || '').trim().toLowerCase();
+      return c === 'book' || c === 'books';
+    }
     function renderOffList() {
       var ul = $('offlist');
       ul.textContent = '';
       if (!data.offList.length) { ul.appendChild(el('li', 'empty', 'Nothing yet.')); return; }
-      data.offList.forEach(function (o) {
+      var books = [], others = [];
+      data.offList.forEach(function (o) { (isOffListBook(o) ? books : others).push(o); });
+      books.sort(function (a, b) {
+        var cmp = bookTitleKey(a.itemName).localeCompare(bookTitleKey(b.itemName), undefined, { sensitivity: 'base' });
+        return cmp || String(a.itemName || '').localeCompare(String(b.itemName || ''), undefined, { sensitivity: 'base' });
+      });
+      books.concat(others).forEach(function (o) {
         var li = el('li');
         var box = el('div', 'it');
         box.appendChild(el('div', 'name', o.itemName));
